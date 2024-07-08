@@ -562,12 +562,23 @@ class BurpExtender(IBurpExtender, ITab, IMessageEditorController, IContextMenuFa
     def createMenuItems(self, invocation):
 
         
-
+       def parameters_to_string(parameters):
+            param_strings = []
+            for param in parameters:
+                # Extract parameter name and value
+                name = param.getName()
+                value = param.getValue()
+                # Format as name=value
+                param_strings.append(name + "="+value)
+            # Join all parameter strings with '&'
+            return "&".join(param_strings)
 
         def addRequestsToTab(e):
             for messageInfo in messages:
                 requestInfo = self._helpers.analyzeRequest(messageInfo)
                 name = str(requestInfo.getMethod()).ljust(8) + requestInfo.getUrl().getPath()
+                new_request = self._helpers.bytesToString(messageInfo.getRequest())
+                
                 # Grab regex from response
                 regex = "^HTTP/1\\.1 200 OK"
                 response = messageInfo.getResponse()
@@ -578,10 +589,19 @@ class BurpExtender(IBurpExtender, ITab, IMessageEditorController, IContextMenuFa
                         regex = "^"+re.escape(responseCodeHeader)
                 # Must create a new RequestResponseStored object since modifying the original messageInfo
                 # from its source (such as Repeater) changes this saved object. MessageInfo is a reference, not a copy
-                messageIndex = self._db.createNewMessage(RequestResponseStored(self,requestResponse=messageInfo), name, regex)
-            self._messageTable.redrawTable()
-            self._chainTable.redrawTable()
-            self.highlightTab()
+                flag = True
+                for message in self._db.arrayOfMessages:                    
+                    old_request = self._helpers.bytesToString(message._requestResponse.getRequest())
+                    if old_request == new_request:
+                        flag = False
+                    
+                if flag == True:    
+                    messageIndex = self._db.createNewMessage(RequestResponseStored(self,requestResponse=messageInfo), name, regex)
+                    
+                    self._messageTable.redrawTable()
+                    self._chainTable.redrawTable()
+                    self.highlightTab()
+
 
 
         class UserCookiesActionListener(ActionListener):
